@@ -1,0 +1,3 @@
+db.url=jdbc:derby://localhost:1527/PersonsDB
+db.user=root
+db.password=root
