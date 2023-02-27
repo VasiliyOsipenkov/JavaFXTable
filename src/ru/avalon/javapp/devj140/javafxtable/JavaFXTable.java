@@ -6,11 +6,16 @@
 package ru.avalon.javapp.devj140.javafxtable;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,6 +36,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+import ru.avalon.javapp.devj140.javafxtable.models.Users;
 
 
 /**
@@ -42,10 +48,20 @@ public class JavaFXTable extends Application {
     private TextField userName;
     private PasswordField password;
     private Text loginCheck;
+   
     @Override
     public void start(Stage primaryStage) {
         loginData = new Properties();
         File propertyFile = new File("loginData.prop");
+        
+        try {
+            loginData.load(new FileReader(propertyFile));        
+        } catch (IOException ex) {
+            Logger.getLogger(JavaFXTable.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        String url = loginData.getProperty("db.url");
+        String user = loginData.getProperty("db.user");
+        String pword = loginData.getProperty("db.password");
          
         Text welcome= new Text("Welcome");
         welcome.setFont(Font.font(25));
@@ -66,7 +82,11 @@ public class JavaFXTable extends Application {
         login.setOnAction(new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {
-                getlogin(propertyFile);
+                if(dbLoginCheck(url, user, pword)){
+                    primaryStage.close();
+                    new PersonTable(url, user, pword).init();
+                } else loginCheck.setVisible(true);
+                    
             }
         });
         GridPane.setHalignment(login, HPos.RIGHT);
@@ -87,12 +107,12 @@ public class JavaFXTable extends Application {
        
         root.add(loginCheck, 0, 3);
         
-        root.add(login, 1, 3, 1, 1);
-        
+        root.add(login, 1, 3, 1, 1);      
+               
         Scene scene = new Scene(root, 300, 250);
         
         primaryStage.setTitle("JavaFXTable");
-        primaryStage.setScene(scene);
+        primaryStage.setScene(scene); 
         primaryStage.show();
     }
 
@@ -103,31 +123,28 @@ public class JavaFXTable extends Application {
         launch(args);
     }
     
-    private void getlogin(File propertyFile){
-        try {
-            loginData.load(new FileReader(propertyFile));
-            
-            if(dbConnectCheck(loginData.getProperty("db.url"), userName.getText(), password.getText())) {
-                Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                alert.setTitle("Success!");
-                alert.setHeaderText("Connection...");
-                alert.setContentText("Сonnection successful!");
-                loginCheck.setVisible(false);
-                alert.showAndWait();
-            } else
-                loginCheck.setVisible(true);
-         
-        } catch (IOException ex) {
-            Logger.getLogger(JavaFXTable.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    } 
+    private void getlogin(String url, String user, String pword){
+        new PersonTable(url, user, pword).init(); 
+    }     
     
-    private boolean dbConnectCheck(String url, String user, String password) {
-        try(Connection conn = DriverManager.getConnection(url, user, password)){
-            return true;
-        } catch (SQLException ex) {
-            return false;       
+    private boolean dbLoginCheck(String url, String user, String pword){
+        try(Connection conn = DriverManager.getConnection(url, user, pword);
+                Statement stm = conn.createStatement()){
+            List<Users> userList = new ArrayList<>();
+            try(ResultSet rs = stm.executeQuery("select * from USERS")){
+                while(rs.next()){
+                    int id = rs.getInt(1);
+                    String name = rs.getString(2);
+                    String userPassword = rs.getString(3);
+                    userList.add(new Users(id, name, userPassword));
+                }                                 
+            }
+            for(Users u : userList){
+            if(u.getName().equals(userName.getText()) && u.getPassword().equals(password.getText()))
+                return true;
+            }               
+        } catch (SQLException ex) {               
         }
-        
+        return false;
     }
 }
